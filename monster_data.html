@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>怪物掉落查詢 (純前端)</title>
+    <title>怪物掉落查詢 (多條件)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,18 +26,35 @@
         }
         .search-section {
             display: flex;
+            flex-wrap: wrap; /* 允許項目換行 */
             gap: 10px;
             margin-bottom: 20px;
             justify-content: center;
             align-items: center;
         }
-        input[type="text"] {
-            padding: 12px;
+        .search-item {
+            flex: 1 1 45%; /* 讓項目在小螢幕上換行，大螢幕上佔一半寬度 */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .search-item label {
+            white-space: nowrap; /* 防止文字換行 */
+            font-weight: bold;
+        }
+        input[type="text"], select {
+            padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            flex-grow: 1;
-            max-width: 400px;
+            flex-grow: 1; /* 讓輸入框和下拉選單佔據剩餘空間 */
             font-size: 16px;
+            min-width: 120px; /* 最小寬度 */
+        }
+        .search-buttons {
+            flex: 1 1 100%; /* 按鈕佔滿一行 */
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
         }
         button {
             padding: 12px 20px;
@@ -87,6 +104,13 @@
             color: #666;
             margin-top: 10px;
         }
+
+        /* 針對小螢幕調整 */
+        @media (max-width: 600px) {
+            .search-item {
+                flex: 1 1 100%; /* 小螢幕上每個項目佔滿一行 */
+            }
+        }
     </style>
 </head>
 <body>
@@ -94,8 +118,25 @@
         <h1>天堂2怪物掉落查詢</h1>
 
         <div class="search-section">
-            <input type="text" id="monsterNameInput" placeholder="請輸入怪物名稱 (支援模糊查詢)" onkeyup="if(event.key === 'Enter') searchDrops()">
-            <button onclick="searchDrops()">查詢</button>
+            <div class="search-item">
+                <label for="monsterNameInput">怪物名稱:</label>
+                <input type="text" id="monsterNameInput" placeholder="輸入怪物名稱" onkeyup="if(event.key === 'Enter') searchDrops()">
+            </div>
+            <div class="search-item">
+                <label for="dropMethodSelect">掉落方式:</label>
+                <select id="dropMethodSelect">
+                    <option value="全部">全部</option>
+                    <option value="回收">回收</option>
+                    <option value="掉落">掉落</option>
+                    <option value="任務物品">任務物品</option> </select>
+            </div>
+            <div class="search-item">
+                <label for="itemNameInput">物品名稱:</label>
+                <input type="text" id="itemNameInput" placeholder="輸入物品名稱" onkeyup="if(event.key === 'Enter') searchDrops()">
+            </div>
+            <div class="search-buttons">
+                <button onclick="searchDrops()">查詢</button>
+            </div>
         </div>
 
         <p id="loadingMessage">資料載入中，請稍候...</p>
@@ -128,7 +169,9 @@
         }
 
         function searchDrops() {
-            const monsterName = document.getElementById('monsterNameInput').value.trim();
+            const monsterName = document.getElementById('monsterNameInput').value.trim().toLowerCase();
+            const dropMethod = document.getElementById('dropMethodSelect').value;
+            const itemName = document.getElementById('itemNameInput').value.trim().toLowerCase();
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = ''; // 清空之前的結果
 
@@ -137,18 +180,31 @@
                 return;
             }
 
-            if (!monsterName) {
-                resultsDiv.innerHTML = '<p class="error-message">請輸入怪物名稱。</p>';
+            // 如果所有搜尋條件都為空，則提示使用者
+            if (!monsterName && dropMethod === '全部' && !itemName) {
+                resultsDiv.innerHTML = '<p class="no-results">請輸入至少一個搜尋條件。</p>';
                 return;
             }
 
-            // 執行模糊查詢，不區分大小寫
-            const filteredResults = monsterData.filter(item =>
-                item['怪物名稱'] && item['怪物名稱'].toLowerCase().includes(monsterName.toLowerCase())
-            );
+            const filteredResults = monsterData.filter(item => {
+                const itemMonsterName = item['怪物名稱'] ? String(item['怪物名稱']).toLowerCase() : '';
+                const itemDropMethod = item['掉落方式'] ? String(item['掉落方式']) : '';
+                const itemItemName = item['物品名稱'] ? String(item['物品名稱']).toLowerCase() : '';
+
+                // 條件1: 怪物名稱模糊匹配
+                const matchMonsterName = monsterName === '' || itemMonsterName.includes(monsterName);
+
+                // 條件2: 掉落方式匹配
+                const matchDropMethod = dropMethod === '全部' || itemDropMethod === dropMethod;
+
+                // 條件3: 物品名稱模糊匹配
+                const matchItemName = itemName === '' || itemItemName.includes(itemName);
+
+                return matchMonsterName && matchDropMethod && matchItemName;
+            });
 
             if (filteredResults.length === 0) {
-                resultsDiv.innerHTML = `<p class="no-results">找不到 '${monsterName}' 的掉落資訊。</p>`;
+                resultsDiv.innerHTML = `<p class="no-results">找不到符合條件的掉落資訊。</p>`;
             } else {
                 let tableHTML = '<table class="result-table">';
                 tableHTML += '<thead><tr><th>怪物名稱</th><th>掉落方式</th><th>物品名稱</th></tr></thead>';
